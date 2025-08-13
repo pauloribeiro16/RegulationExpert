@@ -1,0 +1,16 @@
+{
+  "project_name": "Documents Portal",
+  "project_purpose": "Secure storage of sensitive company documents with controlled access, ensuring data encryption, audit trails, and compliance with regulatory standards.",
+  "business_goals": [
+    "Faster access to documents",
+    "long-term improvement of compliance",
+    "and reduction of leaked information risk"
+  ],
+  "stakeholders": [
+    "IT professionals",
+    "HR",
+    "Software developers",
+    "auditors",
+    "occasional guests"
+  ]
+}
