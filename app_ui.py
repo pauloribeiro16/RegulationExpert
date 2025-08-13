@@ -1,4 +1,4 @@
-# app_ui.py
+# app_ui.py - CANONICAL VERSION
 import streamlit as st
 import json
 import argparse
@@ -42,9 +42,8 @@ st.set_page_config(page_title="The Scribe", page_icon="✍️", layout="centered
 # --- Session State Management ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
-    st.session_state.current_persona = "conductor" # Start with the conductor
+    st.session_state.current_persona = "conductor"
     
-    # Format the initial system prompt with project context
     conductor_prompt = prompts["conductor"]["system_prompt"]
     initial_system_message = ChatMessage(
         role=MessageRole.SYSTEM, 
@@ -52,19 +51,17 @@ if "messages" not in st.session_state:
     )
     st.session_state.messages.append(initial_system_message)
     
-    # Add the first visible message from the assistant
     st.session_state.messages.append(ChatMessage(role=MessageRole.ASSISTANT, content="Greetings! I am The Scribe. I have loaded your project context. Does this look correct, or would you like to add more detail?"))
 
 # --- Sidebar for Controls ---
 with st.sidebar:
     st.header("Controls")
-    if st.button("Save & End Session", use_container_width=True):
+    if st.button("Save Session Log", use_container_width=True):
         log_dir = config.LOG_DIRECTORY
         os.makedirs(log_dir, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         log_file = os.path.join(log_dir, f"session_{timestamp}.json")
         
-        # Save only user and assistant messages for a clean log
         save_data = [
             {"role": msg.role.name, "content": msg.content} 
             for msg in st.session_state.messages 
@@ -74,15 +71,15 @@ with st.sidebar:
         with open(log_file, 'w', encoding='utf-8') as f:
             json.dump(save_data, f, indent=2)
         
-        st.success(f"Session saved to:\n{log_file}")
-        st.info("You can now close this window.")
-        st.stop() # Halts the script
+        st.success(f"Session log saved to: {log_file}")
+        st.info("You can now close this browser tab.")
+        st.warning("To end the session completely, please return to your terminal and press `Ctrl+C`.")
+        st.stop()
 
 # --- Main Chat Interface ---
 st.title("✍️ The Scribe")
 st.caption(f"Compliance Co-Pilot | Powered by: `{args.model_name}` | Persona: `{st.session_state.current_persona}`")
 
-# Display chat history, ignoring system messages
 for message in st.session_state.messages:
     if message.role != MessageRole.SYSTEM:
         with st.chat_message(message.role.name):
@@ -96,26 +93,31 @@ if prompt := st.chat_input("Your message..."):
         st.markdown(prompt)
 
     # Persona Handoff Logic
-    if st.session_state.current_persona == "conductor" and "gdpr" in prompt.lower():
-        st.session_state.current_persona = "gdpr_expert"
-        
-        # Announce the handoff to the user
-        handoff_message = "Excellent. Connecting you to our GDPR specialist now..."
-        st.session_state.messages.append(ChatMessage(role=MessageRole.ASSISTANT, content=handoff_message))
-        with st.chat_message("ASSISTANT"):
-            st.markdown(handoff_message)
+    if st.session_state.current_persona == "conductor":
+        if "gdpr" in prompt.lower():
+            st.session_state.current_persona = "gdpr_expert"
+            handoff_message = "Excellent. Connecting you to our GDPR specialist now..."
+            expert_prompt_key = "gdpr_expert"
+        elif "nis2" in prompt.lower():
+            st.session_state.current_persona = "nis2_expert"
+            handoff_message = "Understood. Connecting you to our NIS 2 specialist now..."
+            expert_prompt_key = "nis2_expert"
+        else:
+            expert_prompt_key = None
+
+        if expert_prompt_key:
+            st.session_state.messages.append(ChatMessage(role=MessageRole.ASSISTANT, content=handoff_message))
+            with st.chat_message("ASSISTANT"):
+                st.markdown(handoff_message)
             
-        # Silently insert the new system prompt for the expert
-        expert_system_prompt = prompts["gdpr_expert"]["system_prompt"]
-        st.session_state.messages.append(ChatMessage(role=MessageRole.SYSTEM, content=expert_system_prompt))
+            expert_system_prompt = prompts[expert_prompt_key]["system_prompt"]
+            st.session_state.messages.append(ChatMessage(role=MessageRole.SYSTEM, content=expert_system_prompt))
 
     # --- LLM Call ---
     with st.chat_message("ASSISTANT"):
         with st.spinner("The Scribe is thinking..."):
-            # Filter for only the messages relevant to the current LLM call
             response = llm.chat(st.session_state.messages)
             response_content = response.message.content
             st.markdown(response_content)
     
-    # Add AI's response to state
     st.session_state.messages.append(ChatMessage(role=MessageRole.ASSISTANT, content=response_content))
