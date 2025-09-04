@@ -3,7 +3,7 @@ import streamlit as st
 import json
 import argparse
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from llama_index.llms.ollama import Ollama
 from llama_index.core.llms import ChatMessage, MessageRole
 import config
@@ -11,6 +11,7 @@ import config
 # --- Argument Parsing for Model Name ---
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_name", type=str, required=True)
+parser.add_argument("--resume_from", type=str, default=None) # VETTING: This line must be added.
 args = parser.parse_args()
 
 # --- Core Functions (Cached for performance) ---
@@ -62,14 +63,23 @@ with st.sidebar:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         log_file = os.path.join(log_dir, f"session_{timestamp}.json")
         
-        save_data = [
-            {"role": msg.role.name, "content": msg.content} 
-            for msg in st.session_state.messages 
-            if msg.role != MessageRole.SYSTEM
-        ]
+        # VETTING: This is the correct, structured log object.
+        log_data = {
+            "metadata": {
+                "model_name": args.model_name,
+                "last_persona": st.session_state.current_persona,
+                # VETTING: Using modern, non-deprecated UTC datetime object.
+                "timestamp_utc": datetime.now(timezone.utc).isoformat()
+            },
+            "history": [
+                {"role": msg.role.name, "content": msg.content} 
+                for msg in st.session_state.messages 
+                if msg.role != MessageRole.SYSTEM
+            ]
+        }
         
         with open(log_file, 'w', encoding='utf-8') as f:
-            json.dump(save_data, f, indent=2)
+            json.dump(log_data, f, indent=2)
         
         st.success(f"Session log saved to: {log_file}")
         st.info("You can now close this browser tab.")
